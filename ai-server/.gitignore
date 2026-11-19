@@ -1,0 +1,9 @@
+.env
+__pycache__/
+.pytest_cache/
+data/
+db/out/
+models/*
+!models/.gitkeep
+models.tgz
+samples_real_photos/

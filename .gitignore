@@ -1,0 +1,38 @@
+# ── 비밀값 ── (예시 파일 .env.example 은 올림)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ── AI 서버 ──
+ai-server/models/*
+!ai-server/models/.gitkeep
+ai-server/models.tgz
+ai-server/data/
+ai-server/db/out/
+ai-server/samples_real_photos/
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+venv/
+
+# ── 백엔드 (Gradle) ──
+backend/build/
+backend/.gradle/
+backend/bin/
+backend/out/
+
+# ── 프론트엔드 (Vite) ──
+frontend/node_modules/
+frontend/dist/
+
+# ── 편집기·OS ──
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+desktop.ini
+.DS_Store
