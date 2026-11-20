@@ -36,3 +36,6 @@ frontend/dist/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# 전체 DB 백업 (회원 정보 포함, 커밋 금지)
+ai-server/db/backup/*_full.sql
