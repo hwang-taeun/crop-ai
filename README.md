@@ -71,6 +71,7 @@ flowchart LR
 ```
 crop-ai/
 ├── README.md
+├── scripts/                     # 실행 스크립트: ai.sh, backend.sh, front.sh, status.sh, stop.sh (env.sh: 공통 경로)
 ├── docs/
 │   ├── api-spec.md              # REST API 명세 v1.1
 │   ├── setup.md                 # 상세 설치 · 데이터 재생성 안내
@@ -205,7 +206,9 @@ GPU가 없으면 Colab 무료 T4 GPU로 학습합니다 (약 15분).
 
 ## 5. 빠른 시작
 
-4장을 마친 뒤 터미널 3개에서 실행합니다.
+4장을 마친 뒤 **처음 한 번 설치(5-1)**를 하고, 이후에는 **스크립트(5-2)**로 실행합니다.
+
+### 5-1. 처음 한 번 — 설치와 확인
 
 | 프로그램 | 확인한 버전 | 설치 예 (Rocky/Alma Linux) |
 |---|---|---|
@@ -248,6 +251,30 @@ npm run dev                                            # 브라우저에서 http
 > - WSL에서는 venv를 `/mnt/c`가 아닌 리눅스 홈(`~/venvs`)에 두어야 설치가 빠릅니다.
 > - 백엔드가 뜨기 전에 화면에서 요청하면 "서버 준비 중"(502)이 나옵니다. 잠시 기다리면 됩니다.
 > - 개발 서버가 `/api` 요청을 8080으로 넘겨주므로 CORS 설정이 따로 필요 없습니다.
+
+### 5-2. 이후 실행 — 스크립트
+
+위 ①~③ 명령을 `scripts/`에 묶어 두었습니다. 저장소 위치는 스크립트가 스스로 찾으므로 어느 폴더에 받아도 그대로 동작합니다.
+
+```bash
+cd "$ROOT"
+scripts/ai.sh          # 터미널 1 — ① AI 서버 :8000
+scripts/backend.sh     # 터미널 2 — ② 백엔드 :8080 (DB 비밀번호 입력)
+scripts/front.sh       # 터미널 3 — ③ 화면 :5173 (node_modules 없으면 npm install 먼저)
+```
+```bash
+scripts/status.sh      # 8000 · 8080 · 5173 · MySQL 3306 켜짐/꺼짐
+scripts/stop.sh        # 세 서버 모두 끄기
+```
+
+| 스크립트 | 하는 일 |
+|---|---|
+| `env.sh` | 공통 경로 (직접 실행하지 않음). venv·비밀값 위치가 다르면 `VENV`, `SECRETS` 환경변수로 바꿈 — 기본값 `~/venvs/crop-ai`, `~/.secrets` |
+| `ai.sh` · `backend.sh` · `front.sh` | 각 서버를 터미널 하나에서 실행 (창 제목도 ①②③으로 바뀜, `Ctrl+C`로 종료) |
+| `status.sh` · `stop.sh` | 상태 확인 · 전체 종료 |
+
+> - 스크립트는 MySQL을 켜지 않습니다. `status.sh`에서 MySQL이 꺼짐이면 먼저 켜세요 (WSL: `sudo service mysql start`).
+> - 비밀값은 스크립트에 들어 있지 않고 실행할 때 `~/.secrets/`에서 읽습니다.
 
 ## 6. 환경변수
 
