@@ -6,3 +6,5 @@ BACK="$ROOT/backend"
 FRONT="$ROOT/frontend"
 VENV="${VENV:-$HOME/venvs/crop-ai}"
 SECRETS="${SECRETS:-$HOME/.secrets}"
+SITE_DOMAIN="${SITE_DOMAIN:-crop-ai.taeun.org}"   # nginx로 서비스할 때 도메인
+WEB_ROOT="${WEB_ROOT:-/var/www/crop-ai}"          # nginx가 화면 파일을 읽는 곳

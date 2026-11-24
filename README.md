@@ -71,7 +71,9 @@ flowchart LR
 ```
 crop-ai/
 ├── README.md
-├── scripts/                     # 실행 스크립트: ai.sh, backend.sh, front.sh, status.sh, stop.sh (env.sh: 공통 경로)
+├── scripts/                     # 실행 스크립트: ai.sh, backend.sh, front.sh, deploy-front.sh, status.sh, stop.sh (env.sh: 공통 경로)
+├── deploy/
+│   └── nginx/crop-ai.conf       # nginx 설정: 화면 정적 파일 + /api 프록시
 ├── docs/
 │   ├── api-spec.md              # REST API 명세 v1.1
 │   ├── setup.md                 # 상세 설치 · 데이터 재생성 안내
@@ -206,7 +208,7 @@ GPU가 없으면 Colab 무료 T4 GPU로 학습합니다 (약 15분).
 
 ## 5. 빠른 시작
 
-4장을 마친 뒤 **처음 한 번 설치(5-1)**를 하고, 이후에는 **스크립트(5-2)**로 실행합니다.
+4장을 마친 뒤 **처음 한 번 설치(5-1)**를 하고, 이후에는 **스크립트(5-2)**로 실행합니다. 화면을 개발 서버가 아닌 **nginx로 서비스**하려면 5-3을 따릅니다.
 
 ### 5-1. 처음 한 번 — 설치와 확인
 
@@ -260,21 +262,68 @@ npm run dev                                            # 브라우저에서 http
 cd "$ROOT"
 scripts/ai.sh          # 터미널 1 — ① AI 서버 :8000
 scripts/backend.sh     # 터미널 2 — ② 백엔드 :8080 (DB 비밀번호 입력)
-scripts/front.sh       # 터미널 3 — ③ 화면 :5173 (node_modules 없으면 npm install 먼저)
+scripts/front.sh       # 터미널 3 — ③ 화면 :5173 (개발할 때만. node_modules 없으면 npm install 먼저)
 ```
 ```bash
-scripts/status.sh      # 8000 · 8080 · 5173 · MySQL 3306 켜짐/꺼짐
-scripts/stop.sh        # 세 서버 모두 끄기
+scripts/status.sh      # 8000 · 8080 · 5173 · nginx 80 · MySQL 3306 켜짐/꺼짐
+scripts/stop.sh        # 세 서버 모두 끄기 (nginx는 그대로)
 ```
 
 | 스크립트 | 하는 일 |
 |---|---|
-| `env.sh` | 공통 경로 (직접 실행하지 않음). venv·비밀값 위치가 다르면 `VENV`, `SECRETS` 환경변수로 바꿈 — 기본값 `~/venvs/crop-ai`, `~/.secrets` |
+| `env.sh` | 공통 경로·기본값 (직접 실행하지 않음). 환경변수로 바꿀 수 있음 — `VENV`(`~/venvs/crop-ai`), `SECRETS`(`~/.secrets`), `SITE_DOMAIN`(`crop-ai.taeun.org`), `WEB_ROOT`(`/var/www/crop-ai`) |
 | `ai.sh` · `backend.sh` · `front.sh` | 각 서버를 터미널 하나에서 실행 (창 제목도 ①②③으로 바뀜, `Ctrl+C`로 종료) |
+| `deploy-front.sh` | 화면 빌드(`npm run build`) → `WEB_ROOT`로 복사 (5-3) |
 | `status.sh` · `stop.sh` | 상태 확인 · 전체 종료 |
 
 > - 스크립트는 MySQL을 켜지 않습니다. `status.sh`에서 MySQL이 꺼짐이면 먼저 켜세요 (WSL: `sudo service mysql start`).
 > - 비밀값은 스크립트에 들어 있지 않고 실행할 때 `~/.secrets/`에서 읽습니다.
+
+### 5-3. nginx로 서비스
+
+`npm run dev`(Vite)는 코드를 요청마다 변환하는 **개발용 서버**입니다. 서비스할 때는 화면을 정적 파일로 빌드해 **nginx**가 제공하고, `/api`만 Spring으로 넘깁니다. Spring(내장 Tomcat)과 AI 서버(uvicorn)는 그대로 실행합니다.
+
+```
+브라우저 → crop-ai.taeun.org → nginx ─┬─ /      → /var/www/crop-ai (빌드한 화면)
+                                       └─ /api/  → Spring :8080 → AI 서버 :8000
+```
+
+```bash
+cd "$ROOT"
+sudo dnf install -y nginx
+sudo cp deploy/nginx/crop-ai.conf /etc/nginx/conf.d/
+sudo nginx -t
+sudo systemctl enable --now nginx        # systemd가 없는 WSL이면: sudo nginx
+scripts/deploy-front.sh                  # 화면 빌드·복사 (화면 코드를 고칠 때마다)
+scripts/ai.sh                            # 터미널 1
+scripts/backend.sh                       # 터미널 2
+```
+
+- 로컬에서 도메인으로 열려면 Windows `C:\Windows\System32\drivers\etc\hosts`(관리자 권한)에 `127.0.0.1 crop-ai.taeun.org`를 추가합니다. WSL은 시작할 때 이 내용을 가져옵니다.
+- 도메인이 다르면 `crop-ai.conf`의 `server_name`과 `SITE_DOMAIN`을 같이 바꿉니다 (`backend.sh`가 이 도메인을 CORS 허용 목록에 넣음).
+
+| nginx 설정 | 이유 |
+|---|---|
+| `try_files $uri $uri/ /index.html` | React Router 주소(`/history` 등)에서 새로고침해도 404가 나지 않게 |
+| `client_max_body_size 10m` | nginx 기본 1MB → 사진 업로드 413. 백엔드 제한과 맞춤 |
+| `proxy_set_header Host $host`, `X-Forwarded-*` | Spring이 원래 도메인·접속자 IP를 알 수 있게 |
+
+#### 장비를 나눌 때 바꾸는 곳
+
+코드는 고치지 않습니다. **앞 장비에서 뒤 장비 주소를 바꾸고, 뒤 장비는 앞 장비에서 오는 요청만 받습니다.**
+
+| 나누는 구간 | 앞 장비 | 뒤 장비 |
+|---|---|---|
+| nginx ↔ Spring | `crop-ai.conf`의 `upstream` 주소를 Spring 내부 IP로 | Spring이 `0.0.0.0`/내부 IP에서 받는지 확인 (`server.address` 설정 없음), 방화벽으로 nginx IP만 8080 허용 |
+| Spring ↔ AI 서버 | `AI_BASE_URL=http://AI내부IP:8000 scripts/backend.sh` | `AI_HOST=AI내부IP scripts/ai.sh`, 방화벽으로 Spring IP만 8000 허용, `~/.secrets/crop_internal_token`을 **같은 값**으로 복사 |
+
+```bash
+# 뒤 장비 방화벽 예 (Spring 서버에서 nginx만 허용)
+sudo firewall-cmd --permanent --add-rich-rule='rule family=ipv4 source address=10.0.0.10/32 port port=8080 protocol=tcp accept'
+sudo firewall-cmd --reload
+```
+
+> 장비가 나뉘면 서버 사이 구간에 내부 토큰과 사진이 평문으로 지나갑니다. 같은 내부망이면 방화벽 제한으로 충분하고, 다른 망을 거치면 그 구간도 TLS(`proxy_pass https://…`, `AI_BASE_URL=https://…`)로 바꿉니다.
 
 ## 6. 환경변수
 
@@ -284,9 +333,10 @@ scripts/stop.sh        # 세 서버 모두 끄기
 | `JWT_SECRET` | backend | ✅ | `~/.secrets/crop_jwt_secret` (32바이트 이상) |
 | `DB_PASSWORD` | backend | ✅ | `crop_backend` 계정 비밀번호 |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` | backend | | `localhost` / `3306` / `my_ncpms` / `crop_backend` |
-| `AI_BASE_URL` | backend | | `http://127.0.0.1:8000` |
+| `AI_BASE_URL` | backend | | `http://127.0.0.1:8000` (AI 서버가 다른 장비면 그 내부 IP) |
+| `AI_HOST` | ai-server (`scripts/ai.sh`) | | `127.0.0.1` (다른 장비에서 받을 때만 내부 IP) |
 | `UPLOAD_DIR` | backend | | `~/crop-data/uploads` |
-| `CORS_ORIGINS` | backend | | `http://localhost:5173` |
+| `CORS_ORIGINS` | backend | | `http://localhost:5173` (쉼표로 여러 개. `scripts/backend.sh`는 `SITE_DOMAIN`의 http·https 주소를 함께 넣음) |
 | `NCPMS_API_KEY` | ai-server DB 도구 | | 병 정보를 다시 받을 때만 |
 
 전체 예시: [`backend/.env.example`](backend/.env.example), [`ai-server/.env.example`](ai-server/.env.example)
@@ -316,7 +366,8 @@ scripts/stop.sh        # 세 서버 모두 끄기
 | 권한 | 다른 회원의 진단 기록·사진 접근 시 403 |
 | 업로드 | 10MB 제한(413), 확장자가 아닌 파일 앞부분(매직 바이트)으로 jpg/png 판별, 저장 경로는 서버가 UUID로 생성 + 경로 탈출 검사 |
 | AI 서버 장애 | 503 응답 + 저장한 사진 정리, AI 호출은 DB 트랜잭션 밖에서 수행 |
-| 내부 통신 | AI 서버는 127.0.0.1에서만 대기, Spring ↔ AI 서버는 공유 토큰 + 상수 시간 비교 |
+| 내부 통신 | AI 서버는 기본 127.0.0.1에서만 대기 (장비를 나누면 내부 IP + 방화벽으로 Spring IP만 허용), Spring ↔ AI 서버는 공유 토큰 + 상수 시간 비교 |
+| 앞단 | nginx만 외부에 열고 Spring·AI 서버는 그 뒤에 둠, 업로드 크기 제한을 nginx·백엔드 양쪽에 적용 |
 | 비밀값 | DB 비밀번호·토큰·서명 키는 환경변수로만 주입, 저장소에 없음 |
 | DB 계정 | 앱 계정은 `my_ncpms` 데이터 읽기·쓰기만 (테이블 생성·변경 권한 없음) |
 | 모델 파일 | 저장소에는 gpg(AES256) 암호화본 `models.tgz.gpg`와 체크섬만 포함 |

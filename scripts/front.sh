@@ -1,5 +1,5 @@
 #!/bin/bash
-# ③ React 개발 서버 (포트 5173)
+# ③ React 개발 서버 (포트 5173) — 개발할 때만. 서비스는 nginx (scripts/deploy-front.sh)
 printf '\033]0;③ React 화면 :5173\007'
 source "$(dirname "$0")/env.sh"
 cd "$FRONT"

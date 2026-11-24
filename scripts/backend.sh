@@ -5,6 +5,9 @@ source "$(dirname "$0")/env.sh"
 cd "$BACK"
 export INTERNAL_TOKEN=$(cat "$SECRETS/crop_internal_token")
 export JWT_SECRET=$(cat "$SECRETS/crop_jwt_secret")
+export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:5173,http://$SITE_DOMAIN,https://$SITE_DOMAIN}"
+# AI 서버가 다른 장비면: AI_BASE_URL=http://내부IP:8000 scripts/backend.sh
+export AI_BASE_URL="${AI_BASE_URL:-http://127.0.0.1:8000}"
 read -rsp "DB 비밀번호(crop_backend): " DB_PASSWORD; echo; export DB_PASSWORD
 echo "===== ② Spring 서버 시작 (포트 8080) — 'Started CropBackendApplication' 이 나오면 준비 완료 ====="
 exec ./gradlew bootRun
